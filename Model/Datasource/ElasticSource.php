@@ -673,6 +673,10 @@ class ElasticSource extends DataSource {
 				'key' => 'query',
 				'onEmpty' => 'skip'
 			),
+                        'aggs' => array(
+				'key' => 'aggs',
+				'onEmpty' => 'skip'
+			),
 		);
 
 		$queryData['conditions'] = $this->parseConditions($Model, $queryData['conditions']);
@@ -722,7 +726,7 @@ class ElasticSource extends DataSource {
 			$query = array($type => compact('query', 'filter'));
 		}
 
-		$query = compact('query', 'size', 'sort', 'from', 'fields', 'script_fields', 'facets');
+		$query = compact('query', 'size', 'sort', 'from', 'fields', 'script_fields', 'facets', 'aggs');
 
 		if ($Model->findQueryType === 'count') {
 			return (!empty($this->config['filteredCount']) ? ['query' => $query['query']] : $query['query']);
@@ -1398,6 +1402,7 @@ class ElasticSource extends DataSource {
 			} else {
 				$body = null;
 			}
+                        
 
 			return $this->filterResults($this->execute($method, $type, $api, compact('body')));
 		} else {
@@ -1497,6 +1502,11 @@ class ElasticSource extends DataSource {
  * @author David Kullmann
  */
 	public function filterResults($results = array()) {
+                if (!empty($results['_shards']) && !empty($results['_shards']['failures'])) {
+                    foreach ($results['_shards']['failures'] as $failure) {
+                        throw new ElasticShardFailureException($failure['reason'], $failure['status']);
+                    }
+                }
 		if (!empty($this->currentModel)) {
 			if ($this->currentModel->findQueryType === 'count') {
 				return isset($results['count']) ? $results['count'] : $results;
@@ -1510,6 +1520,14 @@ class ElasticSource extends DataSource {
 				$this->currentModel->_facets[$facet] = $data;
 			}
 		}
+                if (!empty($results['aggregations'])) {
+                    if (!isset($this->currentModel->_aggregations)) {
+				$this->currentModel->_aggregations = array();
+			}
+			foreach ($results['aggregations'] as $agg => $data) {
+				$this->currentModel->_aggregations[$agg] = $data['buckets'];
+			}
+                }
 		if (!empty($results['hits'])) {
 			foreach($results['hits']['hits'] as &$result) {
 				$tmp = isset($result['_source']) ? $result['_source'] : array();

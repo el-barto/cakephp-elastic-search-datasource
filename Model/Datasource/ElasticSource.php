@@ -780,11 +780,12 @@ class ElasticSource extends DataSource {
 			}
 
 			$direction = 'asc';
+                        $missing = false;
 
 			if (is_string($value)) {
 			} elseif (is_array($value)) {
-				$field = key($value);
-				$direction = current($value);
+                                $field = key($value);
+                                $direction = current($value);
 			}
 
 			if (isset($field) && $field === '_script') {
@@ -827,7 +828,15 @@ class ElasticSource extends DataSource {
 					);
 					break;
 				default:
-					$results[] = array($alias . '.' . $field => array('order' => strtolower($direction)));
+                                        $order_dict = array();
+                                        if (is_array($direction) && 
+                                            !empty($direction['order'])) {
+                                            $direction['order'] = strtolower($direction['order']);
+                                            $order_dict[$alias . '.' . $field] = $direction;
+                                        } else {
+                                             $order_dict[$alias . '.' . $field] = array('order' => strtolower($direction));
+                                        }
+                                        $results[] = $order_dict;
 			}
 		}
 

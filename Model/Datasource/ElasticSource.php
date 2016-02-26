@@ -772,76 +772,74 @@ class ElasticSource extends DataSource {
 		$results = array();
 
 		$order = $query['order'];
-
+                
 		foreach ($order as $key => $value) {
-
+                    
 			if ($key === 0 && empty($value)) {
 				return false;
 			}
-
-			$direction = 'asc';
-                        $missing = false;
-
+                        
 			if (is_string($value)) {
+                            // FIXME: This is empty since the original version
 			} elseif (is_array($value)) {
-                                $field = key($value);
-                                $direction = current($value);
-			}
-
-			if (isset($field) && $field === '_script') {
-				$results[] = $value;
-				continue;
-			}
-
-			$alias = $Model->alias;
-
-			if (strpos($field, '.')) {
-				list($_alias, $_field) = explode('.', $field, 2);
-				if (ctype_upper($_alias[0])) {
-					$alias = $_alias;
-					$field = $_field;
-				}
-			}
-
-			if ($alias !== $Model->alias) {
-				$aliasModel = ClassRegistry::init($alias);
-				$type = $this->getColumnType($aliasModel, $field);
-			} else {
-				$type = $this->getColumnType($Model, $field);
-			}
-
-			if ($alias === $Model->alias && !empty($model->useType) && $Model->useType !== $alias) {
-				$alias =  $Model->useType;
-			}
-
-			switch ($type) {
-				case 'geo_point':
-					$results[] = array(
-						'_geo_distance' => array(
-							$alias . '.' . $field => array(
-								'lat' => $query['latitude'],
-								'lon' => $query['longitude']
-							),
-							'order' => strtolower($direction),
-							'distance_type' => 'plane'
-						)
-					);
-					break;
-				default:
-                                        $order_dict = array();
-                                        if (is_array($direction) && 
-                                            !empty($direction['order'])) {
-                                            $direction['order'] = strtolower($direction['order']);
-                                            $order_dict[$alias . '.' . $field] = $direction;
-                                        } else {
-                                             $order_dict[$alias . '.' . $field] = array('order' => strtolower($direction));
-                                        }
-                                        $results[] = $order_dict;
+                                foreach ($value as $field => $direction) {
+                                    $results[] = $this->_processOrderField($Model, $field, $direction);
+                                }
 			}
 		}
-
+                
 		return $results;
 	}
+        
+        protected function _processOrderField(Model $Model, $field, $direction) {
+            $result = null;
+            $alias = $Model->alias;
+
+            if (strpos($field, '.')) {
+                    list($_alias, $_field) = explode('.', $field, 2);
+                    if (ctype_upper($_alias[0])) {
+                            $alias = $_alias;
+                            $field = $_field;
+                    }
+            }
+
+            if ($alias !== $Model->alias) {
+                    $aliasModel = ClassRegistry::init($alias);
+                    $type = $this->getColumnType($aliasModel, $field);
+            } else {
+                    $type = $this->getColumnType($Model, $field);
+            }
+
+            if ($alias === $Model->alias && !empty($Model->useType) && $Model->useType !== $alias) {
+                    $alias =  $Model->useType;
+            }
+
+            switch ($type) {
+                    case 'geo_point':
+                            $result = array(
+                                    '_geo_distance' => array(
+                                            $alias . '.' . $field => array(
+                                                    'lat' => $query['latitude'],
+                                                    'lon' => $query['longitude']
+                                            ),
+                                            'order' => strtolower($direction),
+                                            'distance_type' => 'plane'
+                                    )
+                            );
+                            break;
+                    default:
+                            $order_dict = array();
+                            if (is_array($direction) && 
+                                !empty($direction['order'])) {
+                                $direction['order'] = strtolower($direction['order']);
+                                $order_dict[$alias . '.' . $field] = $direction;
+                            } else {
+                                 $order_dict[$alias . '.' . $field] = array('order' => strtolower($direction));
+                            }
+                            $result = $order_dict;
+            }
+            return $result;
+        }
 
 /**
  * Used to parse a key for ElasticSearch filters

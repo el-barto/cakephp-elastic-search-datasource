@@ -1532,7 +1532,7 @@ class ElasticSource extends DataSource {
 				$this->currentModel->_aggregations = array();
 			}
 			foreach ($results['aggregations'] as $agg => $data) {
-				$this->currentModel->_aggregations[$agg] = $data['buckets'];
+				$this->currentModel->_aggregations[$agg] = $data;
 			}
                 }
 		if (!empty($results['hits'])) {
